@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relie la lettre au mot</title>
+<style>
+:root{--bg:#fdf6e3;--panel:#fff;--ink:#1f2a44;--accent:#2a6fdb;--ok:#2e9e5b;--ko:#d6453d;--soft:#e8eefc;--line:#2a6fdb}
+@media (prefers-color-scheme:dark){:root{--bg:#161b2b;--panel:#202740;--ink:#f1f3fa;--accent:#7aa7ff;--soft:#2c3558;--line:#7aa7ff}}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:"Trebuchet MS","Comic Sans MS",system-ui,sans-serif;display:flex;flex-direction:column;padding:10px 14px;gap:10px}
+h1{font-size:1.3rem;margin:0;text-align:center}
+main{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:14px;min-height:0}
+.panel{background:var(--panel);border-radius:18px;padding:12px 16px;display:flex;flex-direction:column;min-height:0}
+.panel h2{font-size:1.05rem;margin:0 0 6px;text-align:center}
+.board{position:relative;flex:1;display:flex;justify-content:space-between;align-items:stretch;padding:0 6%}
+.col{display:flex;flex-direction:column;justify-content:space-around;align-items:center;z-index:2}
+svg{position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none}
+.item{font:inherit;color:inherit;border:3px solid var(--accent);background:var(--soft);border-radius:14px;cursor:pointer;
+  font-size:clamp(1.1rem,3.6vh,2rem);padding:.3em .7em;min-width:3em;text-align:center;touch-action:manipulation}
+.item.word{display:flex;align-items:center;gap:.5em;text-align:left}
+.pic{font-size:1.3em;line-height:1;font-family:'Apple Color Emoji','Segoe UI Emoji','Noto Color Emoji',sans-serif}
+.item.letter{font-weight:700;min-width:2.2em}
+.item.sel{background:var(--accent);color:#fff;transform:scale(1.07)}
+.item.ok{border-color:var(--ok)}
+.item.ko{border-color:var(--ko)}
+.gap{display:inline-block;width:.8em;border-bottom:4px solid currentColor;margin-right:.08em}
+.bar{display:flex;justify-content:center;align-items:center;gap:12px;flex-wrap:wrap;min-height:44px}
+.btn{font:inherit;font-weight:700;border:0;border-radius:12px;padding:.5em 1.2em;background:var(--accent);color:#fff;cursor:pointer;font-size:1.05rem}
+.btn.alt{background:var(--soft);color:var(--ink)}
+#msg{font-weight:700;font-size:1.1rem}
+@media (max-width:700px) and (orientation:portrait){main{grid-template-columns:1fr;overflow:auto}.panel{min-height:380px}}
+</style>
+</head>
+<body>
+<h1>Relie chaque lettre au mot qui commence par cette lettre</h1>
+<main>
+  <section class="panel"><h2>Exemple</h2><div class="board" id="ex"></div></section>
+  <section class="panel"><h2>À toi !</h2><div class="board" id="game"></div></section>
+</main>
+<div class="bar">
+  <button class="btn" id="check">Vérifier</button>
+  <button class="btn alt" id="again">Nouvel exercice</button>
+  <span id="msg" aria-live="polite"></span>
+</div>
+
+<script>
+// ---------- Données : modifier ici les lettres et les mots ----------
+// Pour chaque lettre : le 1er mot sert d'exemple (colonne de gauche),
+// les suivants sont tirés au hasard pour la partie "À toi !".
+const LETTRES = ["A","B","C","D","E"];
+const MOTS = {
+  A:["Arbre","Avion","Ananas","Assiette","Abeille"],
+  B:["Bébé","Bateau","Banane","Ballon","Bonbon"],
+  C:["Citron","Chat","Chien","Cadeau","Cahier"],
+  D:["Docteur","Dent","Doigt","Dessin","Dauphin"],
+  E:["École","Eau","Escargot","Étoile","Éponge"]
+};
+// Pictogramme de chaque mot (emoji). Un mot sans entrée s'affiche sans image.
+const IMAGES = {
+  Arbre:"🌳",Avion:"✈️",Ananas:"🍍",Assiette:"🍽️",Abeille:"🐝",
+  "Bébé":"👶",Bateau:"⛵",Banane:"🍌",Ballon:"⚽",Bonbon:"🍬",
+  Citron:"🍋",Chat:"🐱",Chien:"🐶",Cadeau:"🎁",Cahier:"📓",
+  Docteur:"🧑‍⚕️",Dent:"🦷",Doigt:"👆",Dessin:"🎨",Dauphin:"🐬",
+  "École":"🏫",Eau:"💧",Escargot:"🐌","Étoile":"⭐","Éponge":"🧽"
+};
+// ---------------------------------------------------------------------
+const EXEMPLE = LETTRES.map(l=>MOTS[l][0]);
+
+// Synthèse vocale
+let voix=null;
+function choisirVoix(){const v=speechSynthesis.getVoices();voix=v.find(x=>/^fr/i.test(x.lang))||null}
+if('speechSynthesis' in window){choisirVoix();speechSynthesis.onvoiceschanged=choisirVoix}
+function lire(t){
+  if(!('speechSynthesis' in window))return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(t);u.lang='fr-FR';if(voix)u.voice=voix;u.rate=.85;
+  speechSynthesis.speak(u);
+}
+
+const melange=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const initiale=w=>w[0].normalize('NFD')[0].toUpperCase(); // É -> E
+
+class Board{
+  constructor(el,mots,{exemple}){
+    this.el=el;this.mots=mots;this.exemple=exemple;
+    this.ordreL=exemple?mots.map((_,i)=>i):melange(mots.map((_,i)=>i));
+    this.ordreM=exemple?mots.map((_,i)=>i):melange(mots.map((_,i)=>i));
+    if(!exemple){ // éviter l'ordre identique
+      let n=0;while(n++<20&&this.ordreL.every((v,i)=>v===this.ordreM[i]))this.ordreM=melange(this.ordreM);
+    }
+    this.liens=new Map(); // index lettre -> index mot
+    this.sel=null;this.verifie=false;
+    this.build();
+    if(exemple)mots.forEach((_,i)=>this.liens.set(i,i));
+    requestAnimationFrame(()=>this.dessiner());
+  }
+  build(){
+    const mk=(id,c)=>'<marker id="'+id+'" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0L10 5L0 10z" fill="'+c+'"/></marker>';
+    this.el.innerHTML='<svg><defs>'+mk('b','#2a6fdb')+mk('v','#2e9e5b')+mk('r','#d6453d')+'</defs></svg><div class="col"></div><div class="col"></div>';
+    const [cl,cm]=this.el.querySelectorAll('.col');
+    this.bL={};this.bM={};
+    this.ordreL.forEach(i=>{
+      const b=document.createElement('button');b.className='item letter';b.textContent=initiale(this.mots[i]);
+      b.onclick=()=>this.clic('L',i);cl.appendChild(b);this.bL[i]=b});
+    this.ordreM.forEach(i=>{
+      const b=document.createElement('button');b.className='item word';
+      const w=this.mots[i];
+      if(IMAGES[w]){const p=document.createElement('span');p.className='pic';p.textContent=IMAGES[w];b.appendChild(p)}
+      const t=document.createElement('span');
+      if(this.exemple)t.textContent=w;else{t.innerHTML='<span class="gap"></span>';t.append(w.slice(1))}
+      b.appendChild(t);
+      b.onclick=()=>this.clic('M',i);cm.appendChild(b);this.bM[i]=b});
+    this.svg=this.el.querySelector('svg');
+  }
+  clic(type,i){
+    // lecture du mot entier ou de la lettre
+    lire(type==='M'?this.mots[i]:initiale(this.mots[i]));
+    if(this.exemple)return;
+    if(this.verifie)this.reset(false);
+    if(this.sel&&this.sel.type!==type){
+      const l=type==='L'?i:this.sel.i, m=type==='M'?i:this.sel.i;
+      for(const [k,v] of this.liens)if(k===l||v===m)this.liens.delete(k);
+      this.liens.set(l,m);this.sel=null;
+    }else{
+      this.sel=(this.sel&&this.sel.type===type&&this.sel.i===i)?null:{type,i};
+    }
+    this.maj();
+  }
+  maj(){
+    for(const k in this.bL)this.bL[k].classList.remove('sel','ok','ko');
+    for(const k in this.bM)this.bM[k].classList.remove('sel','ok','ko');
+    if(this.sel)(this.sel.type==='L'?this.bL:this.bM)[this.sel.i].classList.add('sel');
+    this.dessiner();
+  }
+  dessiner(){
+    const s=this.svg;[...s.querySelectorAll('line')].forEach(n=>n.remove());
+    const r0=this.el.getBoundingClientRect();
+    for(const [l,m] of this.liens){
+      const a=this.bL[l].getBoundingClientRect(),b=this.bM[m].getBoundingClientRect();
+      const ln=document.createElementNS('http://www.w3.org/2000/svg','line');
+      ln.setAttribute('x1',a.right-r0.left+4);ln.setAttribute('y1',a.top+a.height/2-r0.top);
+      ln.setAttribute('x2',b.left-r0.left-6);ln.setAttribute('y2',b.top+b.height/2-r0.top);
+      let c='var(--line)',mk='b';
+      if(this.verifie){c=(l===m)?'var(--ok)':'var(--ko)';mk=(l===m)?'v':'r'}
+      ln.setAttribute('stroke',c);ln.setAttribute('stroke-width',4);ln.setAttribute('stroke-linecap','round');
+      ln.setAttribute('marker-end','url(#'+mk+')');
+      s.appendChild(ln);
+    }
+  }
+  verifier(){
+    this.verifie=true;let bon=0;
+    for(const [l,m] of this.liens){
+      const ok=l===m;if(ok)bon++;
+      this.bL[l].classList.add(ok?'ok':'ko');this.bM[m].classList.add(ok?'ok':'ko');
+    }
+    this.dessiner();return bon;
+  }
+  reset(){this.verifie=false;this.maj()}
+}
+
+let jeu;
+function nouveau(){
+  // une mot par lettre (différent de l'exemple), mêmes lettres que l'exemple
+  const choix=LETTRES.map(l=>{const p=MOTS[l].slice(1);return p[Math.floor(Math.random()*p.length)]});
+  jeu=new Board(document.getElementById('game'),choix,{exemple:false});
+  document.getElementById('msg').textContent='';
+}
+const exBoard=new Board(document.getElementById('ex'),EXEMPLE,{exemple:true});
+nouveau();
+
+document.getElementById('again').onclick=nouveau;
+document.getElementById('check').onclick=()=>{
+  const msg=document.getElementById('msg');
+  if(jeu.liens.size<jeu.mots.length){msg.textContent='Relie les 5 lettres avant de vérifier.';return}
+  const n=jeu.verifier();
+  msg.textContent=n===5?'Bravo, 5 sur 5 !':n+' sur 5. Corrige les flèches rouges.';
+};
+let t;addEventListener('resize',()=>{clearTimeout(t);t=setTimeout(()=>{jeu.dessiner();exBoard&&exBoard.dessiner()},100)});
+</script>
+</body>
+</html>
