@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exercices d’alphabétisation</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #fdfeff;
+    --line: #d3dcf0;
+    --margin: #ec8a93;
+    --ink: #1d2b64;
+    --ink-soft: #5a6694;
+    --warn: #d2691e;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: "Andika", "Trebuchet MS", Verdana, sans-serif;
+    color: var(--ink);
+    background-color: var(--paper);
+    background-image:
+      linear-gradient(to right, transparent 47px, var(--margin) 47px, var(--margin) 49px, transparent 49px),
+      repeating-linear-gradient(to bottom, transparent 0, transparent 31px, var(--line) 31px, var(--line) 32px);
+    min-height: 100vh;
+    padding: 32px 16px 48px 64px;
+  }
+  main { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: clamp(1.8rem, 5vw, 2.6rem); margin: 0 0 6px; }
+  .intro { margin: 0 0 28px; font-size: 1.1rem; color: var(--ink-soft); }
+
+  ul.exercices { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+  .exercices a {
+    display: block; text-decoration: none; color: var(--ink);
+    background: #fff; border: 2px solid var(--ink); border-radius: 14px;
+    box-shadow: 0 4px 0 var(--ink);
+    padding: 16px 20px;
+  }
+  .exercices a:hover { background: #eef2ff; }
+  .exercices a:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--ink); }
+  .exercices a:focus-visible { outline: 3px solid var(--warn); outline-offset: 3px; }
+  .titre { display: block; font-size: 1.3rem; font-weight: 700; }
+  .desc { display: block; margin-top: 4px; color: var(--ink-soft); }
+
+  @media (max-width: 700px) {
+    body { padding-left: 24px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Exercices d’alphabétisation</h1>
+  <p class="intro">Choisis un exercice.</p>
+
+  <ul class="exercices">
+
+    <li>
+      <a href="alphabet-ordre.html">
+        <span class="titre">L’alphabet dans l’ordre</span>
+        <span class="desc">Remets les lettres mélangées dans le tableau, de A à Z.</span>
+      </a>
+    </li>
+
+    <!--
+      POUR AJOUTER UN EXERCICE :
+      1. Déposez son fichier à côté de ce sommaire (ex. : mon-exercice.html).
+      2. Copiez le bloc <li> ci-dessous, collez-le juste avant la fin de la liste
+         (avant la balise fermante ul), puis changez le lien et les textes.
+
+    <li>
+      <a href="mon-exercice.html">
+        <span class="titre">Titre de l’exercice</span>
+        <span class="desc">Une phrase qui explique ce qu’il faut faire.</span>
+      </a>
+    </li>
+    -->
+
+  </ul>
+</main>
+</body>
+</html>
